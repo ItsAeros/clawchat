@@ -2,8 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ClawChat</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ClawChat">
+<meta name="theme-color" content="#7c6fff">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -188,14 +194,14 @@ body {
 .ch-messages::-webkit-scrollbar { width: 4px; }
 .ch-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-.msg { display: flex; flex-direction: column; max-width: 85%; animation: msgIn 0.15s ease-out; }
+.msg { display: flex; flex-direction: column; max-width: 85%; min-width: 0; animation: msgIn 0.15s ease-out; }
 .msg.user { align-self: flex-end; align-items: flex-end; }
 .msg.assistant { align-self: flex-start; align-items: flex-start; }
 .msg-role { font-size: 10px; font-weight: 600; color: var(--text3); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.4px; }
 .msg-bubble {
   padding: 8px 11px; border-radius: 10px;
-  font-size: 13px; line-height: 1.55; word-break: break-word;
-  white-space: pre-wrap;
+  font-size: 13px; line-height: 1.55; word-break: break-word; overflow-wrap: break-word;
+  white-space: pre-wrap; min-width: 0;
 }
 .msg.user .msg-bubble {
   background: var(--user-bg); color: #fff;
@@ -209,13 +215,13 @@ body {
 .msg-time { font-size: 10px; color: var(--text3); margin-top: 3px; }
 
 /* streaming indicator */
-.stream-msg { align-self: flex-start; align-items: flex-start; display: flex; flex-direction: column; max-width: 85%; }
+.stream-msg { align-self: flex-start; align-items: flex-start; display: flex; flex-direction: column; max-width: 85%; min-width: 0; }
 .stream-bubble {
   background: var(--surface2); border: 1px solid var(--border);
   border-bottom-left-radius: 4px;
   padding: 8px 11px; border-radius: 10px;
-  font-size: 13px; line-height: 1.55; word-break: break-word; white-space: pre-wrap;
-  color: var(--text);
+  font-size: 13px; line-height: 1.55; word-break: break-word; overflow-wrap: break-word; white-space: pre-wrap;
+  color: var(--text); min-width: 0;
 }
 .stream-bubble::after {
   content: '▋';
@@ -392,6 +398,18 @@ body {
   border-color: var(--accent) !important;
   box-shadow: 0 0 0 3px var(--accent-dim) !important;
 }
+
+/* ── Mobile ── */
+@media (max-width: 520px) {
+  .topbar { padding: 0 12px; gap: 6px; }
+  .topbar-logo-text { display: none; }
+  .conn-status { display: none; }
+  .topbar-btn-text { display: none; }
+  .topbar-btn { padding: 6px 8px; gap: 0; }
+  .grid-wrap { padding: 12px; }
+  #expanded-overlay { padding: 8px; }
+  .expanded-card { height: calc(100vh - 16px); max-height: none; border-radius: 12px; }
+}
 </style>
 </head>
 <body>
@@ -426,14 +444,14 @@ body {
         <rect width="36" height="36" rx="10" fill="#7c6fff"/>
         <path d="M10 24L18 10L26 24M14 20H22" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-      ClawChat
+      <span class="topbar-logo-text">ClawChat</span>
     </div>
     <div class="conn-dot" id="conn-dot"></div>
     <span class="conn-status" id="conn-status">Connecting…</span>
     <div class="topbar-spacer"></div>
     <button class="topbar-btn" id="btn-add-channel">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      Add channel
+      <span class="topbar-btn-text">Add channel</span>
     </button>
     <button class="topbar-btn" id="btn-settings" title="Settings">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.93 2.93l1.06 1.06M10.01 10.01l1.06 1.06M2.93 11.07l1.06-1.06M10.01 3.99l1.06-1.06" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
@@ -485,7 +503,7 @@ const AGENTS = [
 const agentMap = Object.fromEntries(AGENTS.map(a => [a.id, a]));
 
 function sessionKey(agentId) {
-  return agentId === 'main' ? 'main' : `agent:${agentId}:main`;
+  return `agent:${agentId}:main`;
 }
 
 // ── State ────────────────────────────────────────────────
@@ -555,6 +573,13 @@ function handleGatewayEvent(event, payload) {
       ch.streaming = null;
       ch.runId = null;
       renderChannel(ch.agentId);
+      // Browser notification for desktop/Android when tab is not visible
+      if (document.visibilityState !== 'visible' && 'Notification' in window && Notification.permission === 'granted') {
+        const agent = agentMap[ch.agentId];
+        const title = `${agent?.name ?? ch.agentId} replied`;
+        const body = (msg?.text ?? '').slice(0, 120) || 'New message';
+        new Notification(title, { body, icon: '/icon-180.png', tag: ch.agentId });
+      }
     } else if (payload.state === 'error' || payload.state === 'aborted') {
       ch.streaming = null;
       ch.runId = null;
@@ -666,8 +691,10 @@ function onConnected(helloPayload) {
   wsConnected = true;
   setConnStatus('connected');
   document.getElementById('disconn-banner').classList.remove('visible');
-  // Load history for all channels
   channels.forEach(ch => loadHistory(ch.agentId));
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
 }
 
 async function loadHistory(agentId) {
