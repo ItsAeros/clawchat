@@ -372,6 +372,26 @@ body {
 /* Clear history button style */
 .clear-link { font-size: 11px; color: var(--text3); cursor: pointer; text-decoration: underline; padding: 2px 4px; border-radius: 4px; transition: color var(--transition); display: inline-block; }
 .clear-link:hover { color: var(--text2); }
+
+/* ── Drag & Drop ── */
+.channel-card {
+  cursor: grab;
+  transition: all var(--transition);
+}
+.channel-card:active {
+  cursor: grabbing;
+}
+.channel-card.dragging {
+  opacity: 0.6 !important;
+  transform: rotate(5deg) scale(1.05) !important;
+  z-index: 100 !important;
+  box-shadow: var(--shadow) !important;
+}
+.channel-card.drag-over {
+  transform: scale(1.02) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-dim) !important;
+}
 </style>
 </head>
 <body>
